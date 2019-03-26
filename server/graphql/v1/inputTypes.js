@@ -7,7 +7,6 @@ import {
   GraphQLNonNull,
   GraphQLString,
   GraphQLScalarType,
-  GraphQLUnionType,
   GraphQLError,
 } from 'graphql';
 

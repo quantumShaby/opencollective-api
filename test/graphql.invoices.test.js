@@ -32,7 +32,7 @@ async function donate(user, currency, amount, createdAt, collective) {
   }
 }
 
-describe('graphql.invoicesFromTo.test.js', () => {
+describe('graphql.invoices.test.js', () => {
   let xdamman;
 
   before(async () => {
@@ -53,8 +53,8 @@ describe('graphql.invoicesFromTo.test.js', () => {
 
   describe('return transactions', () => {
     const query = `
-        query InvoiceFromTo($dateFrom: InvoiceDateType!, $dateTo: InvoiceDateType!, $collective: String!, $fromCollective: String!) {
-          InvoiceFromTo(dateFrom: $dateFrom, dateTo: $dateTo, collective: $collective, fromCollective: $fromCollective) {
+        query Invoice($invoiceInputType: InvoiceInputType) {
+          Invoice(invoiceInputType: $invoiceInputType) {
             year
             month
             totalAmount
@@ -88,10 +88,12 @@ describe('graphql.invoicesFromTo.test.js', () => {
       const result = await utils.graphqlQuery(
         query,
         {
-          dateFrom: { year: '2017', month: '10' },
-          dateTo: { year: '2016', month: '11' },
-          collective: 'brusselstogether-host',
-          fromCollective: 'xdamman',
+          invoiceInputType: {
+            dateFrom: { year: '2017', month: '10' },
+            dateTo: { year: '2016', month: '11' },
+            collectiveSlug: 'brusselstogether-host',
+            fromCollectiveSlug: 'xdamman',
+          },
         },
         xdamman,
       );
@@ -99,14 +101,16 @@ describe('graphql.invoicesFromTo.test.js', () => {
       expect(result.errors[0].message).to.include('Invalid date');
     });
 
-    it('returns an error if the dateFrom is before 2015', async () => {
+    it('returns an error if the date is before 2015', async () => {
       const result = await utils.graphqlQuery(
         query,
         {
-          dateFrom: { year: '2014', month: '10' },
-          dateTo: { year: '2017', month: '11' },
-          collective: 'brusselstogether-host',
-          fromCollective: 'xdamman',
+          invoiceInputType: {
+            dateFrom: { year: '2014', month: '10' },
+            dateTo: { year: '2017', month: '11' },
+            collectiveSlug: 'brusselstogether-host',
+            fromCollectiveSlug: 'xdamman',
+          },
         },
         xdamman,
       );
@@ -115,10 +119,12 @@ describe('graphql.invoicesFromTo.test.js', () => {
       const result2 = await utils.graphqlQuery(
         query,
         {
-          dateFrom: { year: '2017', month: '10' },
-          dateTo: { year: '2014', month: '11' },
-          collective: 'brusselstogether-host',
-          fromCollective: 'xdamman',
+          invoiceInputType: {
+            dateFrom: { year: '2013', month: '10' },
+            dateTo: { year: '2014', month: '11' },
+            collectiveSlug: 'brusselstogether-host',
+            fromCollectiveSlug: 'xdamman',
+          },
         },
         xdamman,
       );
@@ -126,14 +132,16 @@ describe('graphql.invoicesFromTo.test.js', () => {
       expect(result2.errors[0].message).to.include('Invalid date');
     });
 
-    it('returns an error if the dateFrom month is not a valid month', async () => {
+    it('returns an error if the date month is not a valid month', async () => {
       const result = await utils.graphqlQuery(
         query,
         {
-          dateFrom: { year: '2017', month: '0' },
-          dateTo: { year: '2017', month: '11' },
-          collective: 'brusselstogether-host',
-          fromCollective: 'xdamman',
+          invoiceInputType: {
+            dateFrom: { year: '2017', month: '13' },
+            dateTo: { year: '2017', month: '11' },
+            collectiveSlug: 'brusselstogether-host',
+            fromCollectiveSlug: 'xdamman',
+          },
         },
         xdamman,
       );
@@ -143,10 +151,12 @@ describe('graphql.invoicesFromTo.test.js', () => {
       const result2 = await utils.graphqlQuery(
         query,
         {
-          dateFrom: { year: '2017', month: '10' },
-          dateTo: { year: '2017', month: '0' },
-          collective: 'brusselstogether-host',
-          fromCollective: 'xdamman',
+          invoiceInputType: {
+            dateFrom: { year: '2017', month: '10' },
+            dateTo: { year: '2017', month: '13' },
+            collectiveSlug: 'brusselstogether-host',
+            fromCollectiveSlug: 'xdamman',
+          },
         },
         xdamman,
       );
@@ -156,10 +166,12 @@ describe('graphql.invoicesFromTo.test.js', () => {
 
     it('fails to return list of invoices for a given user if not logged in as that user', async () => {
       const result = await utils.graphqlQuery(query, {
-        dateFrom: { year: '2017', month: '10' },
-        dateTo: { year: '2017', month: '11' },
-        collective: 'brusselstogether-host',
-        fromCollective: 'xdamman',
+        invoiceInputType: {
+          dateFrom: { year: '2017', month: '10' },
+          dateTo: { year: '2017', month: '11' },
+          collectiveSlug: 'brusselstogether-host',
+          fromCollectiveSlug: 'xdamman',
+        },
       });
 
       expect(result.errors).to.exist;
@@ -170,47 +182,27 @@ describe('graphql.invoicesFromTo.test.js', () => {
       const result = await utils.graphqlQuery(
         query,
         {
-          dateFrom: { year: '2017', month: '10' },
-          dateTo: { year: '2017', month: '11' },
-          collective: 'brusselstogether-host',
-          fromCollective: 'xdamman',
+          invoiceInputType: {
+            dateFrom: { year: '2017', month: '10' },
+            dateTo: { year: '2017', month: '11' },
+            collectiveSlug: 'brusselstogether-host',
+            fromCollectiveSlug: 'xdamman',
+          },
         },
         xdamman,
       );
 
       result.errors && console.error(result.errors[0]);
       expect(result.errors).to.not.exist;
-      const invoice = result.data.InvoiceFromTo;
+      const invoice = result.data.Invoice;
       expect(invoice.host.slug).to.equal('brusselstogether-host');
       expect(invoice.fromCollective.slug).to.equal('xdamman');
       expect(invoice.totalAmount).to.equal(1500);
       expect(invoice.currency).to.equal('EUR');
       expect(invoice.transactions).to.have.length(2);
     });
-  });
-});
 
-describe('graphql.invoices.test.js', () => {
-  let xdamman;
-
-  before(async () => {
-    // First reset the test database
-    await utils.resetTestDB();
-    // Given a user and its collective
-    const { user } = await store.newUser('xdamman');
-    xdamman = user;
-    // And given the collective (with their host)
-    const { collective } = await store.newCollectiveWithHost('brusselstogether', 'EUR', 'EUR', 10);
-    // And given some donations to that collective
-    await donate(user, 'EUR', 1000, '2017-09-03 00:00', collective);
-    await donate(user, 'EUR', 1000, '2017-10-05 00:00', collective);
-    await donate(user, 'EUR', 500, '2017-10-25 00:00', collective);
-    await donate(user, 'EUR', 500, '2017-11-05 00:00', collective);
-    await donate(user, 'EUR', 500, '2017-11-25 00:00', collective);
-  });
-
-  describe('return transactions', () => {
-    it('fails to return list of invoices for a given user if not logged in as that user', async () => {
+    it('fails to return list of invoices for a given user if not logged in as that user using the legacy slug', async () => {
       const query = `
         query allInvoices($fromCollectiveSlug: String!) {
           allInvoices(fromCollectiveSlug: $fromCollectiveSlug) {

@@ -16,7 +16,7 @@ import {
   HostCollectiveOrderFieldType,
 } from './CollectiveInterface';
 
-import { InvoiceDateType } from './inputTypes';
+import { InvoiceInputType } from './inputTypes';
 
 import {
   PaginatedTransactionsType,
@@ -170,26 +170,23 @@ const queries = {
     },
   },
 
-  InvoiceFromTo: {
+  Invoice: {
     type: InvoiceType,
     args: {
-      dateFrom: {
-        type: new GraphQLNonNull(InvoiceDateType),
+      invoiceInputType: {
+        type: InvoiceInputType,
+        description:
+          'Like the  Slug of the invoice but spilt out into parts and includes dateTo for getting an invoice over a date range.',
       },
-      dateTo: {
-        type: new GraphQLNonNull(InvoiceDateType),
-      },
-      collective: {
-        type: new GraphQLNonNull(GraphQLString),
-        description: '"host" collective', // TODO: I don't know the domain well enough to name this well
-      },
-      fromCollective: {
-        type: new GraphQLNonNull(GraphQLString),
-        description: '"from" collective', // TODO: I don't know the domain well enough to name this well
+      invoiceSlug: {
+        type: GraphQLString,
+        description: 'Slug of the invoice. Format: :year:2digitMonth.:hostSlug.:fromCollectiveSlug',
       },
     },
     async resolve(_, args, req) {
-      const { dateFrom, dateTo, fromCollective: fromCollectiveSlug, collective: collectiveSlug } = args;
+      const { dateFrom, dateTo, fromCollectiveSlug, collectiveSlug } = args.invoiceSlug
+        ? parseInvoiceSlug(args.invoiceSlug)
+        : args.invoiceInputType;
 
       validateDate(dateFrom);
       validateDate(dateTo);
@@ -241,10 +238,10 @@ const queries = {
         title: get(host, 'settings.invoiceTitle') || 'Donation Receipt',
         HostCollectiveId: host.id,
         slug: args.invoiceSlug,
-        yearFrom: args.dateFrom.year,
-        monthFrom: args.dateFrom.month,
-        yearTo: args.dateTo.year,
-        monthTo: args.dateTo.month,
+        yearFrom: fromYear,
+        monthFrom: fromMonth,
+        yearTo: toYear,
+        monthTo: toMonth,
       };
 
       const totalAmount = transactions.reduce((total, transaction) => {
@@ -262,76 +259,76 @@ const queries = {
     },
   },
 
-  Invoice: {
-    type: InvoiceType,
-    args: {
-      invoiceSlug: {
-        type: GraphQLString,
-        description: 'Slug of the invoice. Format: :year:2digitMonth.:hostSlug.:fromCollectiveSlug',
-      },
-    },
-    async resolve(_, args, req) {
-      const year = args.invoiceSlug.substr(0, 4);
-      const month = args.invoiceSlug.substr(4, 2);
-      const hostSlug = args.invoiceSlug.substring(7, args.invoiceSlug.lastIndexOf('.'));
-      const fromCollectiveSlug = args.invoiceSlug.substr(args.invoiceSlug.lastIndexOf('.') + 1);
-      if (!hostSlug || year < 2015 || (month < 1 || month > 12)) {
-        throw new errors.ValidationFailed(
-          'Invalid invoiceSlug format. Should be :year:2digitMonth.:hostSlug.:fromCollectiveSlug',
-        );
-      }
-      const fromCollective = await models.Collective.findOne({
-        where: { slug: fromCollectiveSlug },
-      });
-      if (!fromCollective) {
-        throw new errors.NotFound(`User or organization not found for slug ${fromCollectiveSlug}`);
-      }
-      const host = await models.Collective.findBySlug(hostSlug);
-      if (!host) {
-        throw new errors.NotFound('Host not found');
-      }
-      if (!req.remoteUser || !req.remoteUser.isAdmin(fromCollective.id)) {
-        throw new errors.Unauthorized("You don't have permission to access invoices for this user");
-      }
-
-      const startsAt = new Date(`${year}-${month}-01`);
-      const endsAt = new Date(startsAt);
-      endsAt.setMonth(startsAt.getMonth() + 1);
-
-      const where = {
-        [Op.or]: [
-          { FromCollectiveId: fromCollective.id, UsingVirtualCardFromCollectiveId: null },
-          { UsingVirtualCardFromCollectiveId: fromCollective.id },
-        ],
-        HostCollectiveId: host.id,
-        createdAt: { [Op.gte]: startsAt, [Op.lt]: endsAt },
-        type: 'CREDIT',
-      };
-
-      const transactions = await models.Transaction.findAll({ where });
-      if (transactions.length === 0) {
-        throw new errors.NotFound('No transactions found');
-      }
-
-      const invoice = {
-        title: get(host, 'settings.invoiceTitle') || 'Donation Receipt',
-        HostCollectiveId: host.id,
-        slug: args.invoiceSlug,
-        yearFrom: year,
-        monthFrom: month,
-      };
-      let totalAmount = 0;
-      transactions.map(transaction => {
-        totalAmount += transaction.amountInHostCurrency;
-        invoice.currency = transaction.hostCurrency;
-      });
-      invoice.FromCollectiveId = fromCollective.id;
-      invoice.totalAmount = totalAmount;
-      invoice.currency = invoice.currency || host.currency;
-      invoice.transactions = transactions;
-      return invoice;
-    },
-  },
+  //  Invoice: {
+  //    type: InvoiceType,
+  //    args: {
+  //      invoiceSlug: {
+  //        type: GraphQLString,
+  //        description: 'Slug of the invoice. Format: :year:2digitMonth.:hostSlug.:fromCollectiveSlug',
+  //      },
+  //    },
+  //    async resolve(_, args, req) {
+  //      const year = args.invoiceSlug.substr(0, 4);
+  //      const month = args.invoiceSlug.substr(4, 2);
+  //      const hostSlug = args.invoiceSlug.substring(7, args.invoiceSlug.lastIndexOf('.'));
+  //      const fromCollectiveSlug = args.invoiceSlug.substr(args.invoiceSlug.lastIndexOf('.') + 1);
+  //      if (!hostSlug || year < 2015 || (month < 1 || month > 12)) {
+  //        throw new errors.ValidationFailed(
+  //          'Invalid invoiceSlug format. Should be :year:2digitMonth.:hostSlug.:fromCollectiveSlug',
+  //        );
+  //      }
+  //      const fromCollective = await models.Collective.findOne({
+  //        where: { slug: fromCollectiveSlug },
+  //      });
+  //      if (!fromCollective) {
+  //        throw new errors.NotFound(`User or organization not found for slug ${fromCollectiveSlug}`);
+  //      }
+  //      const host = await models.Collective.findBySlug(hostSlug);
+  //      if (!host) {
+  //        throw new errors.NotFound('Host not found');
+  //      }
+  //      if (!req.remoteUser || !req.remoteUser.isAdmin(fromCollective.id)) {
+  //        throw new errors.Unauthorized("You don't have permission to access invoices for this user");
+  //      }
+  //
+  //      const startsAt = new Date(`${year}-${month}-01`);
+  //      const endsAt = new Date(startsAt);
+  //      endsAt.setMonth(startsAt.getMonth() + 1);
+  //
+  //      const where = {
+  //        [Op.or]: [
+  //          { FromCollectiveId: fromCollective.id, UsingVirtualCardFromCollectiveId: null },
+  //          { UsingVirtualCardFromCollectiveId: fromCollective.id },
+  //        ],
+  //        HostCollectiveId: host.id,
+  //        createdAt: { [Op.gte]: startsAt, [Op.lt]: endsAt },
+  //        type: 'CREDIT',
+  //      };
+  //
+  //      const transactions = await models.Transaction.findAll({ where });
+  //      if (transactions.length === 0) {
+  //        throw new errors.NotFound('No transactions found');
+  //      }
+  //
+  //      const invoice = {
+  //        title: get(host, 'settings.invoiceTitle') || 'Donation Receipt',
+  //        HostCollectiveId: host.id,
+  //        slug: args.invoiceSlug,
+  //        yearFrom: year,
+  //        monthFrom: month,
+  //      };
+  //      let totalAmount = 0;
+  //      transactions.map(transaction => {
+  //        totalAmount += transaction.amountInHostCurrency;
+  //        invoice.currency = transaction.hostCurrency;
+  //      });
+  //      invoice.FromCollectiveId = fromCollective.id;
+  //      invoice.totalAmount = totalAmount;
+  //      invoice.currency = invoice.currency || host.currency;
+  //      invoice.transactions = transactions;
+  //      return invoice;
+  //    },
+  //  },
 
   /**
    * Get an invoice for a single transaction.
@@ -1367,5 +1364,29 @@ function validateDate(dateObj) {
       'Invalid date object. Must have a valid month, where 1 == January, and be after 2014',
     );
   }
+}
+
+function parseInvoiceSlug(invoiceSlug) {
+  const year = invoiceSlug.substr(0, 4);
+  const month = invoiceSlug.substr(4, 2);
+  const collectiveSlug = invoiceSlug.substring(7, invoiceSlug.lastIndexOf('.'));
+  const fromCollectiveSlug = invoiceSlug.substr(invoiceSlug.lastIndexOf('.') + 1);
+  if (!collectiveSlug || year < 2015 || (month < 1 || month > 12)) {
+    throw new errors.ValidationFailed(
+      'Invalid invoiceSlug format. Should be :year:2digitMonth.:hostSlug.:fromCollectiveSlug',
+    );
+  }
+  return {
+    dateFrom: {
+      year,
+      month,
+    },
+    dateTo: {
+      year,
+      month: String(Number(month) + 1),
+    },
+    collectiveSlug,
+    fromCollectiveSlug,
+  };
 }
 export default queries;

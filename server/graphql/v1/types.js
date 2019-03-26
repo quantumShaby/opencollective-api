@@ -356,14 +356,40 @@ export const InvoiceType = new GraphQLObjectType({
           return invoice.title || 'Donation Receipt';
         },
       },
+      yearFrom: {
+        type: GraphQLInt,
+        resolve(invoice) {
+          return invoice.yearFrom;
+        },
+      },
+      monthFrom: {
+        type: GraphQLInt,
+        resolve(invoice) {
+          return invoice.monthFrom;
+        },
+      },
+      yearTo: {
+        type: GraphQLInt,
+        resolve(invoice) {
+          return invoice.yearTo;
+        },
+      },
+      monthTo: {
+        type: GraphQLInt,
+        resolve(invoice) {
+          return invoice.monthTo;
+        },
+      },
       year: {
         type: GraphQLInt,
+        deprecationReason: 'year is now yearFrom',
         resolve(invoice) {
           return invoice.year;
         },
       },
       month: {
         type: GraphQLInt,
+        deprecationReason: 'month is now monthFrom',
         resolve(invoice) {
           return invoice.month;
         },

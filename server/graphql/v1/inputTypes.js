@@ -7,6 +7,7 @@ import {
   GraphQLNonNull,
   GraphQLString,
   GraphQLScalarType,
+  GraphQLUnionType,
   GraphQLError,
 } from 'graphql';
 
@@ -388,6 +389,17 @@ export const ExpenseInputType = new GraphQLInputObjectType({
       attachment: { type: GraphQLString },
       user: { type: UserInputType },
       collective: { type: CollectiveAttributesInputType },
+    };
+  },
+});
+
+export const InvoiceDateType = new GraphQLInputObjectType({
+  name: 'InvoiceDateType',
+  description: 'Input date for Invoice',
+  fields: () => {
+    return {
+      year: { type: GraphQLString },
+      month: { type: GraphQLString },
     };
   },
 });

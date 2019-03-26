@@ -403,3 +403,16 @@ export const InvoiceDateType = new GraphQLInputObjectType({
     };
   },
 });
+
+export const InvoiceInputType = new GraphQLInputObjectType({
+  name: 'InvoiceInputType',
+  description: 'Input dates and collectives for Invoice',
+  fields: () => {
+    return {
+      dateFrom: { type: InvoiceDateType },
+      dateTo: { type: InvoiceDateType },
+      collectiveSlug: { type: GraphQLString },
+      fromCollectiveSlug: { type: GraphQLString },
+    };
+  },
+});

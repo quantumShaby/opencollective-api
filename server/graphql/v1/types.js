@@ -1,17 +1,21 @@
 import {
   GraphQLBoolean,
   GraphQLEnumType,
+  GraphQLError,
   GraphQLFloat,
   GraphQLInt,
   GraphQLInputObjectType,
   GraphQLList,
   GraphQLObjectType,
   GraphQLString,
+  GraphQLScalarType,
 } from 'graphql';
 
+import { Kind } from 'graphql/language';
 import GraphQLJSON from 'graphql-type-json';
 import he from 'he';
 import { pick } from 'lodash';
+import moment from 'moment';
 
 import { CollectiveInterfaceType, CollectiveSearchResultsType } from './CollectiveInterface';
 
@@ -337,6 +341,27 @@ export const LocationType = new GraphQLObjectType({
   }),
 });
 
+export const IsoDateString = new GraphQLScalarType({
+  name: 'IsoDateString',
+  serialize: value => {
+    return value;
+  },
+  parseValue: value => {
+    return value;
+  },
+  parseLiteral: ast => {
+    if (ast.kind !== Kind.STRING) {
+      throw new GraphQLError(`Query error: Can only parse strings got a: ${ast.kind}`);
+    }
+
+    const date = moment.parseZone(ast.value);
+    if (!date.isValid()) {
+      throw new GraphQLError('Query error: unable to pass date string. Expected a valid ISO-8601 date string.');
+    }
+    return date;
+  },
+});
+
 export const InvoiceType = new GraphQLObjectType({
   name: 'InvoiceType',
   description: 'This represents an Invoice',
@@ -344,6 +369,7 @@ export const InvoiceType = new GraphQLObjectType({
     return {
       slug: {
         type: GraphQLString,
+        deprecationReason: 'The invoice slug is no longer supported because...slugs are gross ;)',
         resolve(invoice) {
           return invoice.slug;
         },
@@ -356,46 +382,31 @@ export const InvoiceType = new GraphQLObjectType({
           return invoice.title || 'Donation Receipt';
         },
       },
-      yearFrom: {
-        type: GraphQLInt,
-        resolve(invoice) {
-          return invoice.yearFrom;
-        },
+      dateFrom: {
+        type: IsoDateString,
+        resolve: invoice => invoice.dateFrom,
       },
-      monthFrom: {
-        type: GraphQLInt,
-        resolve(invoice) {
-          return invoice.monthFrom;
-        },
-      },
-      yearTo: {
-        type: GraphQLInt,
-        resolve(invoice) {
-          return invoice.yearTo;
-        },
-      },
-      monthTo: {
-        type: GraphQLInt,
-        resolve(invoice) {
-          return invoice.monthTo;
-        },
+      dateTo: {
+        type: IsoDateString,
+        resolve: invoice => invoice.dateTo,
       },
       year: {
         type: GraphQLInt,
-        deprecationReason: 'year is now yearFrom',
+        deprecationReason: 'use dateFrom',
         resolve(invoice) {
           return invoice.year;
         },
       },
       month: {
         type: GraphQLInt,
-        deprecationReason: 'month is now monthFrom',
+        deprecationReason: 'use dateFrom',
         resolve(invoice) {
           return invoice.month;
         },
       },
       day: {
         type: GraphQLInt,
+        deprecationReason: 'use dateFrom',
         resolve(invoice) {
           return invoice.day;
         },
@@ -432,16 +443,13 @@ export const InvoiceType = new GraphQLObjectType({
             return invoice.transactions;
           }
 
-          const startsAt = new Date(`${invoice.year}-${invoice.month}-01`);
-          const endsAt = new Date(startsAt);
-          endsAt.setMonth(startsAt.getMonth() + 1);
           const where = {
             [Op.or]: {
               FromCollectiveId: invoice.FromCollectiveId,
               UsingVirtualCardFromCollectiveId: invoice.FromCollectiveId,
             },
             type: 'CREDIT',
-            createdAt: { [Op.gte]: startsAt, [Op.lt]: endsAt },
+            createdAt: { [Op.gte]: invoice.dateFrom, [Op.lt]: invoice.dateTo },
           };
           if (invoice.HostCollectiveId) {
             where.HostCollectiveId = invoice.HostCollectiveId;

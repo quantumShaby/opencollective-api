@@ -5,6 +5,7 @@
 
 import sinon from 'sinon';
 import { expect } from 'chai';
+import moment from 'moment';
 
 /* Test utilities */
 import * as utils from './utils';
@@ -52,156 +53,6 @@ describe('graphql.invoices.test.js', () => {
   });
 
   describe('return transactions', () => {
-    const query = `
-        query Invoice($invoiceInputType: InvoiceInputType) {
-          Invoice(invoiceInputType: $invoiceInputType) {
-            year
-            month
-            totalAmount
-            currency
-            host {
-              id
-              slug
-              location {
-                name
-                address
-              }
-            }
-            fromCollective {
-              id
-              slug
-              location {
-                name
-                address
-              }
-            }
-            transactions {
-              id
-              amount
-              description
-            }
-          }
-        }
-      `;
-
-    it('returns an error if the dateTo is before dateFrom', async () => {
-      const result = await utils.graphqlQuery(
-        query,
-        {
-          invoiceInputType: {
-            dateFrom: { year: '2017', month: '10' },
-            dateTo: { year: '2016', month: '11' },
-            collectiveSlug: 'brusselstogether-host',
-            fromCollectiveSlug: 'xdamman',
-          },
-        },
-        xdamman,
-      );
-
-      expect(result.errors[0].message).to.include('Invalid date');
-    });
-
-    it('returns an error if the date is before 2015', async () => {
-      const result = await utils.graphqlQuery(
-        query,
-        {
-          invoiceInputType: {
-            dateFrom: { year: '2014', month: '10' },
-            dateTo: { year: '2017', month: '11' },
-            collectiveSlug: 'brusselstogether-host',
-            fromCollectiveSlug: 'xdamman',
-          },
-        },
-        xdamman,
-      );
-
-      expect(result.errors[0].message).to.include('Invalid date');
-      const result2 = await utils.graphqlQuery(
-        query,
-        {
-          invoiceInputType: {
-            dateFrom: { year: '2013', month: '10' },
-            dateTo: { year: '2014', month: '11' },
-            collectiveSlug: 'brusselstogether-host',
-            fromCollectiveSlug: 'xdamman',
-          },
-        },
-        xdamman,
-      );
-
-      expect(result2.errors[0].message).to.include('Invalid date');
-    });
-
-    it('returns an error if the date month is not a valid month', async () => {
-      const result = await utils.graphqlQuery(
-        query,
-        {
-          invoiceInputType: {
-            dateFrom: { year: '2017', month: '13' },
-            dateTo: { year: '2017', month: '11' },
-            collectiveSlug: 'brusselstogether-host',
-            fromCollectiveSlug: 'xdamman',
-          },
-        },
-        xdamman,
-      );
-
-      expect(result.errors[0].message).to.include('Invalid date');
-
-      const result2 = await utils.graphqlQuery(
-        query,
-        {
-          invoiceInputType: {
-            dateFrom: { year: '2017', month: '10' },
-            dateTo: { year: '2017', month: '13' },
-            collectiveSlug: 'brusselstogether-host',
-            fromCollectiveSlug: 'xdamman',
-          },
-        },
-        xdamman,
-      );
-
-      expect(result2.errors[0].message).to.include('Invalid date');
-    });
-
-    it('fails to return list of invoices for a given user if not logged in as that user', async () => {
-      const result = await utils.graphqlQuery(query, {
-        invoiceInputType: {
-          dateFrom: { year: '2017', month: '10' },
-          dateTo: { year: '2017', month: '11' },
-          collectiveSlug: 'brusselstogether-host',
-          fromCollectiveSlug: 'xdamman',
-        },
-      });
-
-      expect(result.errors).to.exist;
-      expect(result.errors[0].message).to.contain("You don't have permission to access invoices for this user");
-    });
-
-    it('returns invoice data for a given start and end date', async () => {
-      const result = await utils.graphqlQuery(
-        query,
-        {
-          invoiceInputType: {
-            dateFrom: { year: '2017', month: '10' },
-            dateTo: { year: '2017', month: '11' },
-            collectiveSlug: 'brusselstogether-host',
-            fromCollectiveSlug: 'xdamman',
-          },
-        },
-        xdamman,
-      );
-
-      result.errors && console.error(result.errors[0]);
-      expect(result.errors).to.not.exist;
-      const invoice = result.data.Invoice;
-      expect(invoice.host.slug).to.equal('brusselstogether-host');
-      expect(invoice.fromCollective.slug).to.equal('xdamman');
-      expect(invoice.totalAmount).to.equal(1500);
-      expect(invoice.currency).to.equal('EUR');
-      expect(invoice.transactions).to.have.length(2);
-    });
-
     it('fails to return list of invoices for a given user if not logged in as that user using the legacy slug', async () => {
       const query = `
         query allInvoices($fromCollectiveSlug: String!) {
@@ -226,6 +77,8 @@ describe('graphql.invoices.test.js', () => {
       const query = `
         query allInvoices($fromCollectiveSlug: String!) {
           allInvoices(fromCollectiveSlug: $fromCollectiveSlug) {
+            dateFrom
+            dateTo
             year
             month
             totalAmount
@@ -246,6 +99,10 @@ describe('graphql.invoices.test.js', () => {
       expect(result.errors).to.not.exist;
       const invoices = result.data.allInvoices;
       expect(invoices).to.have.length(3);
+      expect(moment(invoices[0].dateFrom).year()).to.equal(2017);
+      expect(moment(invoices[0].dateFrom).month()).to.equal(10);
+      expect(moment(invoices[0].dateTo).year()).to.equal(2017);
+      expect(moment(invoices[0].dateTo).month()).to.equal(11);
       expect(invoices[0].year).to.equal(2017);
       expect(invoices[0].month).to.equal(11);
       expect(invoices[0].totalAmount).to.equal(1000);
